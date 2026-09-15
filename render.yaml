@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: taekwondo-scoring-system
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: FIRESTORE_DATABASE_ID
+        value: ai-studio-firebasewebconne-406b2eda-33ca-423e-a834-0df2d089be59
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false

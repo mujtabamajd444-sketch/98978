@@ -1,0 +1,8 @@
+{
+  "name": "نظام تسجيل نقاط التايكوندو",
+  "description": "نظام تسجيل نقاط حي للتايكوندو/الرياضة.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
