@@ -1,20 +1,14 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# نظام تسجيل نقاط التايكوندو
 
-# Run and deploy your AI Studio app
+نظام عربي للتحكيم وتسجيل النقاط، مع شاشة نتائج مباشرة، ثلاثة حكام فقط، وسجل نزالات قابل للتعديل.
 
-This contains everything you need to run your app locally.
+## التشغيل المحلي
 
-View your app in AI Studio: https://ai.studio/apps/d9727beb-559d-47ef-8984-bb4cbbd5f0c1
+1. ثبّت الحزم: `npm install`
+2. أنشئ `.env.local` من `.env.example` وأضف إعدادات البدء الآمنة.
+3. ضع مفتاح Firebase Admin محليًا في `firebase-service-account.json` (لا يُرفع إلى GitHub).
+4. شغّل: `npm run dev`
 
-## Run Locally
+## النشر
 
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+يحتوي المشروع على `render.yaml` لاستضافة خادم Node.js. أضف سرّ `FIREBASE_SERVICE_ACCOUNT_JSON` في منصة الاستضافة ولا ترفعه إلى المستودع.
