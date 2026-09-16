@@ -7,9 +7,26 @@ export default function UpdatePrompt() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    void getAvailableVersion().then((version) => {
-      if (version && version !== APP_VERSION) setAvailableVersion(version);
-    });
+    let active = true;
+    const checkForUpdate = () => {
+      void getAvailableVersion().then((version) => {
+        if (active && version && version !== APP_VERSION) setAvailableVersion(version);
+      });
+    };
+    const checkWhenVisible = () => {
+      if (document.visibilityState === 'visible') checkForUpdate();
+    };
+
+    checkForUpdate();
+    const interval = window.setInterval(checkForUpdate, 15_000);
+    window.addEventListener('focus', checkForUpdate);
+    document.addEventListener('visibilitychange', checkWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', checkForUpdate);
+      document.removeEventListener('visibilitychange', checkWhenVisible);
+    };
   }, []);
 
   if (!availableVersion) return null;
