@@ -1,0 +1,20 @@
+{
+  "name": "نظام تسجيل نقاط التايكوندو",
+  "short_name": "تايكوندو",
+  "description": "نظام مباشر لتسجيل نقاط التايكوندو وإدارة لجنة التحكيم.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#0f172a",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "taekwondo-logo.png",
+      "sizes": "2048x2048",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

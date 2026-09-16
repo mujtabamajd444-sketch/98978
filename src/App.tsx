@@ -9,11 +9,13 @@ import RefereePage from './pages/RefereePage';
 import JuryPage from './pages/JuryPage';
 import DisplayPage from './pages/DisplayPage';
 import UpdatePrompt from './components/UpdatePrompt';
+import InstallPrompt from './components/InstallPrompt';
 
 export default function App() {
   return (
     <HashRouter>
       <UpdatePrompt />
+      <InstallPrompt />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/referee" element={<RefereePage />} />
