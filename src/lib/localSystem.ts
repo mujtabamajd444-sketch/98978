@@ -1,3 +1,6 @@
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { db } from './firebase';
+
 export type Winner = 'red' | 'blue';
 type Vote = Winner | null;
 type Handler = (...args: any[]) => void;
@@ -27,6 +30,7 @@ const defaultState = (): State => ({
 let state = defaultState();
 const sockets = new Set<LocalSocket>();
 const channel = new BroadcastChannel('taekwondo-static-system-v1');
+const systemDocument = doc(db, 'systems', 'taekwondo-default');
 let resetTimer: number | undefined;
 
 function copy<T>(value: T): T { return structuredClone(value); }
@@ -46,8 +50,21 @@ function announce(previous?: State) {
 
 function broadcast(previous?: State) {
   channel.postMessage({ type: 'state', state: copy(state) });
+  void setDoc(systemDocument, copy(state)).catch((error) => {
+    console.error('تعذر حفظ حالة النظام في Firestore:', error);
+  });
   announce(previous);
 }
+
+onSnapshot(systemDocument, (snapshot) => {
+  if (!snapshot.exists()) {
+    void setDoc(systemDocument, copy(state)).catch((error) => console.error('تعذر إنشاء حالة النظام في Firestore:', error));
+    return;
+  }
+  const previous = copy(state);
+  state = snapshot.data() as State;
+  announce(previous);
+}, (error) => console.error('تعذر الاتصال بـ Firestore:', error));
 
 channel.onmessage = (event: MessageEvent) => {
   if (event.data?.type === 'request-state') {
@@ -78,7 +95,7 @@ export class LocalSocket {
   receive(event: string, ...args: any[]) { this.handlers.get(event)?.forEach(handler => handler(...args)); }
   disconnect() {
     Object.values(state.referees).forEach(referee => { if (referee.socketId === this.id) referee.socketId = null; });
-    sockets.delete(this); channel.postMessage({ type: 'state', state: copy(state) }); announce(); this.receive('disconnect');
+    sockets.delete(this); broadcast(); this.receive('disconnect');
   }
 
   emit(event: string, payload?: any, callback?: (response: any) => void) {
@@ -138,7 +155,7 @@ export class LocalSocket {
   private resetRound() {
     if (resetTimer) clearTimeout(resetTimer); resetTimer = undefined;
     state.votes = { '1': null, '2': null, '3': null }; state.winner = null;
-    channel.postMessage({ type: 'state', state: copy(state) }); announce(); notifyAll('round_reset');
+    broadcast(); notifyAll('round_reset');
   }
 }
 
