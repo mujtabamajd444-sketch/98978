@@ -3,6 +3,7 @@ import { createLocalSocket, type LocalSocket } from '../lib/localSystem';
 import { RotateCcw, Home, Settings, X, ClipboardList, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { APP_VERSION } from '../lib/version';
+import AnimatedNotice from '../components/AnimatedNotice';
 
 export default function JuryPage() {
   const [isConnected, setIsConnected] = useState(false);
@@ -21,6 +22,7 @@ export default function JuryPage() {
   
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState('');
   const [isMatchesOpen, setIsMatchesOpen] = useState(false);
   const [editingMatch, setEditingMatch] = useState<any | null>(null);
@@ -163,10 +165,11 @@ export default function JuryPage() {
             socketRef.current?.emit('authenticate_jury', passwordInput, (response: any) => {
               if (response.success) {
                 setIsAuthenticated(true);
+                setLoginError(null);
                 setEditPasswords({"1": "", "2": "", "3": "", "jury": ""});
               } else {
                 setPasswordInput('');
-                alert("رمز المرور غير صحيح");
+                setLoginError('رمز الدخول غير صحيح، تحقق منه ثم حاول مرة أخرى.');
               }
             });
           }} className="flex flex-col gap-4">
@@ -184,6 +187,7 @@ export default function JuryPage() {
               دخول
             </button>
           </form>
+          <AnimatedNotice message={loginError} onClose={() => setLoginError(null)} />
           <Link to="/" className="mt-6 inline-block text-slate-400 hover:text-white text-sm transition-colors bg-slate-800/50 px-4 py-2 rounded-full border border-slate-700/50">العودة للرئيسية</Link>
         </div>
       </div>

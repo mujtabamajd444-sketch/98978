@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { createLocalSocket, type LocalSocket } from '../lib/localSystem';
 import { Link } from 'react-router-dom';
 import { Home } from 'lucide-react';
+import AnimatedNotice from '../components/AnimatedNotice';
 
 export default function RefereePage() {
   const [isConnected, setIsConnected] = useState(false);
@@ -17,6 +18,7 @@ export default function RefereePage() {
   
   const [messages, setMessages] = useState<{sender: string, text: string, timestamp: string}[]>([]);
   const [chatInput, setChatInput] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   
   // Use ref to keep track of socket instance for button clicks
@@ -45,13 +47,13 @@ export default function RefereePage() {
     });
 
     socket.on('claim_error', (msg) => {
-      alert(msg);
+      setNotice(msg);
       setRefereePasswordInput('');
     });
 
     socket.on('vote_error', (msg) => {
       setVotedColor(null);
-      alert(msg);
+      setNotice(msg);
     });
 
     socket.on('timer_tick', (data) => {
@@ -80,6 +82,12 @@ export default function RefereePage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   const handleVote = (color: 'red' | 'blue') => {
     if (votedColor || !socketRef.current || !myRefId) return; // Prevent double voting
     socketRef.current.emit('submit_vote', { refereeId: myRefId, color });
@@ -100,6 +108,7 @@ export default function RefereePage() {
   if (!myRefId) {
     return (
       <div className="h-[100dvh] w-full bg-slate-950 text-slate-50 flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
+        <AnimatedNotice message={notice} onClose={() => setNotice(null)} />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/40 via-slate-950 to-slate-950 pointer-events-none"></div>
         
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 w-full max-w-sm shadow-2xl text-center relative z-10">
@@ -169,6 +178,7 @@ export default function RefereePage() {
 
   return (
     <div className="h-[100dvh] w-full bg-slate-950 text-slate-50 flex flex-col overflow-hidden font-sans relative">
+      <AnimatedNotice message={notice} onClose={() => setNotice(null)} />
       {/* Vote Feedback Overlay (shown only after voting) */}
       {votedColor && (
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md border border-slate-700 px-8 py-6 rounded-3xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.8)] text-center flex flex-col items-center gap-4">

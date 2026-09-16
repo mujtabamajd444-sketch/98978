@@ -23,8 +23,8 @@ const defaultState = (): State => ({
   referees: { '1': { name: 'علي', socketId: null }, '2': { name: 'حسين', socketId: null }, '3': { name: 'عباس', socketId: null } },
   votes: { '1': null, '2': null, '3': null }, winner: null, messages: [], rounds: [], matches: [],
   settings: { roundDuration: 0 },
-  // Static hosting cannot protect a secret. These are only initial local interface codes.
-  passwords: { '1': '1111', '2': '2222', '3': '3333', jury: '9999' },
+  // Credentials are loaded from Firestore. Never publish fallback passwords in this static app.
+  passwords: { '1': '', '2': '', '3': '', jury: '' },
 });
 
 let state = defaultState();
