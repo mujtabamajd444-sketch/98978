@@ -8,10 +8,12 @@ import HomePage from './pages/HomePage';
 import RefereePage from './pages/RefereePage';
 import JuryPage from './pages/JuryPage';
 import DisplayPage from './pages/DisplayPage';
+import UpdatePrompt from './components/UpdatePrompt';
 
 export default function App() {
   return (
     <HashRouter>
+      <UpdatePrompt />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/referee" element={<RefereePage />} />

@@ -13,3 +13,7 @@
 ## GitHub Pages
 
 يُنشر تلقائياً إلى GitHub Pages، ويتصل بقاعدة Cloud Firestore للمشروع `gggg111-c6858` من خلال ملف `src/lib/firebase.ts`. لأن GitHub Pages موقع ثابت، لا تضع فيه مفاتيح خادم أو أسرارًا حقيقية. يجب ضبط قواعد Firestore قبل الاستخدام العام.
+
+### التحديثات
+
+رقم الإصدار موجود في `package.json` و`src/lib/version.ts` و`public/version.json`. عند نشر إصدار جديد غيّر الرقم نفسه في الملفات الثلاثة؛ سيتحقق التطبيق من ملف Pages بدون Cache ويعرض زر تحديث عند اختلاف الرقم.

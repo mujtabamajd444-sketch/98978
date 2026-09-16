@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { createLocalSocket, type LocalSocket } from '../lib/localSystem';
 import { RotateCcw, Home, Settings, X, ClipboardList, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { APP_VERSION } from '../lib/version';
 
 export default function JuryPage() {
   const [isConnected, setIsConnected] = useState(false);
@@ -312,6 +313,7 @@ export default function JuryPage() {
             <Home className="w-5 h-5" />
           </Link>
           <h1 className="text-xl sm:text-2xl font-bold tracking-wider text-slate-100 uppercase">لوحة تحكم لجنة التحكيم</h1>
+          <span className="hidden md:inline text-[10px] font-bold tracking-wide text-slate-500" title="إصدار النظام">v{APP_VERSION}</span>
           <div className="hidden sm:flex items-center gap-2 sm:gap-3 bg-slate-800/50 px-3 py-1.5 rounded-full border border-slate-700/50">
             <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
             <span className={`text-xs sm:text-sm font-semibold uppercase tracking-widest ${isConnected ? 'text-emerald-400' : 'text-red-400'}`}>
