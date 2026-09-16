@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { createLocalSocket, type LocalSocket } from '../lib/localSystem';
 import { RotateCcw, Home, Settings, X, ClipboardList, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -30,10 +30,10 @@ export default function JuryPage() {
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
   
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<LocalSocket | null>(null);
 
   useEffect(() => {
-    const socket = io();
+    const socket = createLocalSocket();
     socketRef.current = socket;
 
     socket.on('connect', () => {

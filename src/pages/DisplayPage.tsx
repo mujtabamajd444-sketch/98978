@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { createLocalSocket, type LocalSocket } from '../lib/localSystem';
 import { Link } from 'react-router-dom';
 import { Home } from 'lucide-react';
 
@@ -18,7 +18,7 @@ export default function DisplayPage() {
   const [match, setMatch] = useState<PublicMatch>({ id: 1, title: 'النزال رقم 1', redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق', rounds: [] });
 
   useEffect(() => {
-    const socket: Socket = io();
+    const socket: LocalSocket = createLocalSocket();
 
     socket.on('connect', () => setIsConnected(true));
     socket.on('disconnect', () => setIsConnected(false));

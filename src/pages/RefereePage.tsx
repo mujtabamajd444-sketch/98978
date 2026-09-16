@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { createLocalSocket, type LocalSocket } from '../lib/localSystem';
 import { Link } from 'react-router-dom';
 import { Home } from 'lucide-react';
 
@@ -20,10 +20,10 @@ export default function RefereePage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   
   // Use ref to keep track of socket instance for button clicks
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<LocalSocket | null>(null);
 
   useEffect(() => {
-    const socket = io();
+    const socket = createLocalSocket();
     socketRef.current = socket;
 
     socket.on('connect', () => {
