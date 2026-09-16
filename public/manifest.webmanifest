@@ -1,7 +1,7 @@
 {
-  "name": "نظام تسجيل نقاط التايكوندو",
-  "short_name": "تايكوندو",
-  "description": "نظام مباشر لتسجيل نقاط التايكوندو وإدارة لجنة التحكيم.",
+  "name": "نظام موي تاي",
+  "short_name": "موي تاي",
+  "description": "نظام مباشر لمتابعة وإدارة نزالات موي تاي.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
@@ -23,7 +23,7 @@
       "purpose": "any maskable"
     },
     {
-      "src": "taekwondo-logo.png",
+      "src": "muay-thai-logo.png",
       "sizes": "2048x2048",
       "type": "image/png",
       "purpose": "any maskable"

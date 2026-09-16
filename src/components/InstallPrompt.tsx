@@ -47,7 +47,7 @@ export default function InstallPrompt() {
 
   return (
     <aside dir="rtl" className="fixed bottom-4 left-4 right-4 z-[90] mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-blue-400/30 bg-slate-900/95 p-3 text-slate-50 shadow-2xl backdrop-blur-md" aria-label="تثبيت التطبيق">
-      <img src={`${import.meta.env.BASE_URL}taekwondo-logo.png`} alt="شعار تطبيق التايكوندو" className="h-12 w-12 rounded-xl object-cover" />
+      <img src={`${import.meta.env.BASE_URL}muay-thai-logo.png`} alt="شعار تطبيق موي تاي" className="h-12 w-12 rounded-xl object-cover" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-black">ثبّت التطبيق على جهازك</p>
         <p className="mt-0.5 text-xs leading-5 text-slate-300">افتح النظام لاحقًا من الشاشة الرئيسية.</p>

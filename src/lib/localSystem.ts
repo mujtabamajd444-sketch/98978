@@ -29,8 +29,8 @@ const defaultState = (): State => ({
 
 let state = defaultState();
 const sockets = new Set<LocalSocket>();
-const channel = new BroadcastChannel('taekwondo-static-system-v1');
-const systemDocument = doc(db, 'systems', 'taekwondo-default');
+const channel = new BroadcastChannel('muay-thai-static-system-v1');
+const systemDocument = doc(db, 'systems', 'muay-thai-default');
 let resetTimer: number | undefined;
 
 function copy<T>(value: T): T { return structuredClone(value); }

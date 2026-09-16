@@ -45,7 +45,7 @@ export default function DisplayPage() {
       <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-7xl flex-col">
         <header className="flex items-center justify-between border-b border-slate-800 pb-5 sm:pb-7">
           <div>
-            <p className="mb-1 text-sm font-semibold tracking-[0.25em] text-slate-400">بطولة التايكوندو</p>
+            <p className="mb-1 text-sm font-semibold tracking-[0.25em] text-slate-400">بطولة موي تاي</p>
             <h1 className="text-3xl font-black tracking-tight sm:text-5xl">شاشة النتائج المباشرة</h1>
           </div>
           <div className="flex items-center gap-2">
