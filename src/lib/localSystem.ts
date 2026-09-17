@@ -233,7 +233,11 @@ export class LocalSocket {
         if (current.votes?.[payload.refereeId]) throw new Error('تم تسجيل تصويت هذا الحكم لهذه الجولة');
         current.votes[payload.refereeId] = payload.color;
         const votes = Object.values(current.votes);
-        const winner: Winner | null = votes.filter((vote) => vote === 'red').length >= 2 ? 'red' : votes.filter((vote) => vote === 'blue').length >= 2 ? 'blue' : null;
+        // تنتظر اللجنة أصوات الحكام الثلاثة؛ لا يُحسم القرار بمجرد أول صوتين متطابقين.
+        const allRefereesVoted = votes.length === 3 && votes.every((vote): vote is Winner => vote === 'red' || vote === 'blue');
+        const winner: Winner | null = allRefereesVoted
+          ? votes.filter((vote) => vote === 'red').length >= 2 ? 'red' : 'blue'
+          : null;
         if (winner) {
           current.winner = winner;
           const round: Round = { id: current.rounds.length + 1, winner, timestamp: new Date().toISOString(), votes: copy(current.votes) };
