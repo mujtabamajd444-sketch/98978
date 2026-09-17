@@ -12,6 +12,7 @@ type State = {
   referees: Record<string, Referee>;
   votes: Record<string, Vote>;
   winner: Winner | null;
+  displayWinner: Winner | null;
   messages: Message[];
   rounds: Round[];
   matches: Match[];
@@ -21,7 +22,7 @@ type State = {
 
 const defaultState = (): State => ({
   referees: { '1': { name: 'علي', socketId: null }, '2': { name: 'حسين', socketId: null }, '3': { name: 'عباس', socketId: null } },
-  votes: { '1': null, '2': null, '3': null }, winner: null, messages: [], rounds: [], matches: [],
+  votes: { '1': null, '2': null, '3': null }, winner: null, displayWinner: null, messages: [], rounds: [], matches: [],
   settings: { roundDuration: 0 },
   // Credentials are loaded from Firestore. Never publish fallback passwords in this static app.
   passwords: { '1': '', '2': '', '3': '', jury: '' },
@@ -77,6 +78,7 @@ function announce(previous?: State) {
   notifyAll('update_history', copy(state.rounds));
   notifyAll('update_matches', copy(state.matches));
   notifyAll('update_display', displayMatch());
+  notifyAll('update_display_result', state.displayWinner ?? null);
   if (state.winner) notifyAll('round_result', { winner: state.winner });
   if (previous) state.messages.slice(previous.messages.length).forEach(message => notifyAll('receive_message', message));
 }
@@ -148,6 +150,14 @@ export class LocalSocket {
     if (event === 'authenticate_jury') { this.jury = payload === state.passwords.jury; callback?.({ success: this.jury }); return this; }
     if (event === 'claim_referee') { void this.claimReferee(payload); return this; }
     if (event === 'submit_vote') { void this.submitVote(payload); return this; }
+    if (event === 'set_display_winner') {
+      if (!this.jury) { callback?.({ success: false, message: 'يجب تسجيل دخول لجنة التحكيم أولاً' }); return this; }
+      if (payload !== 'red' && payload !== 'blue') { callback?.({ success: false, message: 'اختر الأحمر أو الأزرق' }); return this; }
+      state.displayWinner = payload;
+      broadcast(previous);
+      callback?.({ success: true });
+      return this;
+    }
     if (event === 'trigger_reset') { if (!this.jury) { callback?.({ success: false, message: 'يجب تسجيل دخول لجنة التحكيم أولاً' }); return this; } this.resetRound(); callback?.({ success: true }); return this; }
     if (event === 'advance_to_next_match') {
       if (!this.jury) { callback?.({ success: false, message: 'يجب تسجيل دخول لجنة التحكيم أولاً' }); return this; }
@@ -181,7 +191,7 @@ export class LocalSocket {
 
   private resetRound() {
     if (resetTimer) clearTimeout(resetTimer); resetTimer = undefined;
-    state.votes = { '1': null, '2': null, '3': null }; state.winner = null;
+    state.votes = { '1': null, '2': null, '3': null }; state.winner = null; state.displayWinner = null;
     broadcast(); notifyAll('round_reset');
   }
 
@@ -308,6 +318,7 @@ export class LocalSocket {
         const current = (snapshot.exists() ? snapshot.data() : state) as State;
         current.votes = { '1': null, '2': null, '3': null };
         current.winner = null;
+        current.displayWinner = null;
         current.matches.push({ id: current.matches.length + 1, title: `النزال رقم ${current.matches.length + 1}`, redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق', rounds: [] });
         transaction.set(systemDocument, current);
         return current;

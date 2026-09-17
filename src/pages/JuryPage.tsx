@@ -325,7 +325,7 @@ export default function JuryPage() {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button onClick={() => setIsMatchesOpen(true)} className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-3 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2" title="سجل النزالات">
             <ClipboardList className="w-4 h-4" />
             <span className="hidden sm:inline">النزالات</span>
@@ -342,8 +342,8 @@ export default function JuryPage() {
             className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2 active:scale-95"
           >
             <RotateCcw className="w-4 h-4" />
-            <span className="hidden sm:inline">إعادة تعيين الجولة</span>
-            <span className="sm:hidden">إعادة</span>
+            <span className="hidden sm:inline">تصفير العرض / جولة جديدة</span>
+            <span className="sm:hidden">تصفير</span>
           </button>
           <button
             onClick={() => socketRef.current?.emit('advance_to_next_match')}
@@ -353,6 +353,22 @@ export default function JuryPage() {
             <SkipForward className="w-4 h-4" />
             <span className="hidden sm:inline">قاضية / نزال جديد</span>
             <span className="sm:hidden">نزال جديد</span>
+          </button>
+          <button
+            onClick={() => socketRef.current?.emit('set_display_winner', 'red')}
+            className="bg-red-600 hover:bg-red-500 text-white border border-red-400/40 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2 active:scale-95"
+            title="عرض فوز الأحمر على شاشة العرض"
+          >
+            <span className="hidden sm:inline">عرض فوز الأحمر</span>
+            <span className="sm:hidden">الأحمر</span>
+          </button>
+          <button
+            onClick={() => socketRef.current?.emit('set_display_winner', 'blue')}
+            className="bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2 active:scale-95"
+            title="عرض فوز الأزرق على شاشة العرض"
+          >
+            <span className="hidden sm:inline">عرض فوز الأزرق</span>
+            <span className="sm:hidden">الأزرق</span>
           </button>
         </div>
       </header>
