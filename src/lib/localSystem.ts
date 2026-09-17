@@ -7,12 +7,13 @@ type Handler = (...args: any[]) => void;
 type Referee = { name: string; socketId: string | null; lastSeen?: number };
 type Round = { id: number; winner: Winner; timestamp: string; votes: Record<string, Vote> };
 type Match = { id: number; title: string; redTeam: string; blueTeam: string; rounds: Round[] };
+type DisplayResult = { winner: Winner; kind: 'round' | 'match'; roundNumber: number };
 type Message = { sender: string; text: string; timestamp: string };
 type State = {
   referees: Record<string, Referee>;
   votes: Record<string, Vote>;
   winner: Winner | null;
-  displayWinner: Winner | null;
+  displayResult: DisplayResult | null;
   messages: Message[];
   rounds: Round[];
   matches: Match[];
@@ -22,7 +23,7 @@ type State = {
 
 const defaultState = (): State => ({
   referees: { '1': { name: 'علي', socketId: null }, '2': { name: 'حسين', socketId: null }, '3': { name: 'عباس', socketId: null } },
-  votes: { '1': null, '2': null, '3': null }, winner: null, displayWinner: null, messages: [], rounds: [], matches: [],
+  votes: { '1': null, '2': null, '3': null }, winner: null, displayResult: null, messages: [], rounds: [], matches: [],
   settings: { roundDuration: 0 },
   // Credentials are loaded from Firestore. Never publish fallback passwords in this static app.
   passwords: { '1': '', '2': '', '3': '', jury: '' },
@@ -78,7 +79,7 @@ function announce(previous?: State) {
   notifyAll('update_history', copy(state.rounds));
   notifyAll('update_matches', copy(state.matches));
   notifyAll('update_display', displayMatch());
-  notifyAll('update_display_result', state.displayWinner ?? null);
+  notifyAll('update_display_result', state.displayResult ?? null);
   if (state.winner) notifyAll('round_result', { winner: state.winner });
   if (previous) state.messages.slice(previous.messages.length).forEach(message => notifyAll('receive_message', message));
 }
@@ -153,8 +154,16 @@ export class LocalSocket {
     if (event === 'set_display_winner') {
       if (!this.jury) { callback?.({ success: false, message: 'يجب تسجيل دخول لجنة التحكيم أولاً' }); return this; }
       if (payload !== 'red' && payload !== 'blue') { callback?.({ success: false, message: 'اختر الأحمر أو الأزرق' }); return this; }
-      state.displayWinner = payload;
+      const match = state.matches.at(-1);
+      const roundNumber = Math.min(match?.rounds.length || 1, 3);
+      const isFinalMatchResult = Boolean(match && match.rounds.length === 3);
+      const redWins = match?.rounds.filter((round) => round.winner === 'red').length || 0;
+      const finalWinner: Winner = redWins >= 2 ? 'red' : 'blue';
+      state.displayResult = { winner: isFinalMatchResult ? finalWinner : payload, kind: isFinalMatchResult ? 'match' : 'round', roundNumber };
       broadcast(previous);
+      if (resetTimer) clearTimeout(resetTimer);
+      // تظهر نتيجة كل جولة 25 ثانية، ثم يُصفّر العرض ويبدأ الحكام الجولة التالية.
+      if (!isFinalMatchResult) resetTimer = window.setTimeout(() => this.resetRound(), 25_000);
       callback?.({ success: true });
       return this;
     }
@@ -186,12 +195,17 @@ export class LocalSocket {
       Object.assign(match, { title: payload.title.trim(), redTeam: payload.redTeam.trim(), blueTeam: payload.blueTeam.trim() });
       broadcast(previous); callback?.({ success: true }); return this;
     }
+    if (event === 'ensure_current_match') {
+      if (!this.jury) { callback?.({ success: false, message: 'يجب تسجيل دخول لجنة التحكيم أولاً' }); return this; }
+      void this.ensureCurrentMatch(callback);
+      return this;
+    }
     return this;
   }
 
   private resetRound() {
     if (resetTimer) clearTimeout(resetTimer); resetTimer = undefined;
-    state.votes = { '1': null, '2': null, '3': null }; state.winner = null; state.displayWinner = null;
+    state.votes = { '1': null, '2': null, '3': null }; state.winner = null; state.displayResult = null;
     broadcast(); notifyAll('round_reset');
   }
 
@@ -224,7 +238,6 @@ export class LocalSocket {
   private async submitVote(payload: { refereeId: string; color: Winner }) {
     const previous = copy(state);
     try {
-      let recordedWinner: Winner | null = null;
       const next = await runTransaction(db, async (transaction) => {
         const snapshot = await transaction.get(systemDocument);
         const current = (snapshot.exists() ? snapshot.data() : state) as State;
@@ -245,17 +258,12 @@ export class LocalSocket {
           let match = current.matches.at(-1);
           if (!match || match.rounds.length === 3) { match = { id: current.matches.length + 1, title: `النزال رقم ${current.matches.length + 1}`, redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق', rounds: [] }; current.matches.push(match); }
           match.rounds.push(round);
-          recordedWinner = winner;
         }
         transaction.set(systemDocument, current);
         return current;
       });
       state = next;
       announceLocalState(previous);
-      if (recordedWinner) {
-        if (resetTimer) clearTimeout(resetTimer);
-        resetTimer = window.setTimeout(() => this.resetRound(), 30_000);
-      }
     } catch (error) {
       this.receive('vote_error', error instanceof Error ? error.message : 'تعذر تسجيل التصويت');
     }
@@ -313,6 +321,27 @@ export class LocalSocket {
     }
   }
 
+  private async ensureCurrentMatch(callback?: (response: any) => void) {
+    const previous = copy(state);
+    try {
+      const next = await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(systemDocument);
+        const current = (snapshot.exists() ? snapshot.data() : state) as State;
+        if (current.matches.length === 0) {
+          current.matches.push({ id: 1, title: 'النزال رقم 1', redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق', rounds: [] });
+          transaction.set(systemDocument, current);
+        }
+        return current;
+      });
+      state = next;
+      announceLocalState(previous);
+      callback?.({ success: true });
+    } catch (error) {
+      callback?.({ success: false, message: 'تعذر تجهيز بيانات النزال' });
+      console.error('تعذر تجهيز النزال الحالي:', error);
+    }
+  }
+
   private async advanceToNextMatch() {
     if (resetTimer) clearTimeout(resetTimer); resetTimer = undefined;
     const previous = copy(state);
@@ -322,7 +351,7 @@ export class LocalSocket {
         const current = (snapshot.exists() ? snapshot.data() : state) as State;
         current.votes = { '1': null, '2': null, '3': null };
         current.winner = null;
-        current.displayWinner = null;
+        current.displayResult = null;
         current.matches.push({ id: current.matches.length + 1, title: `النزال رقم ${current.matches.length + 1}`, redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق', rounds: [] });
         transaction.set(systemDocument, current);
         return current;

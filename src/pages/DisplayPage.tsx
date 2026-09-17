@@ -4,7 +4,8 @@ import { Link } from 'react-router-dom';
 import { Home } from 'lucide-react';
 
 type Winner = 'red' | 'blue';
-type PublicMatch = { id: number; title: string; redTeam: string; blueTeam: string };
+type PublicMatch = { id: number; title: string; redTeam: string; blueTeam: string; rounds?: unknown[] };
+type DisplayResult = { winner: Winner; kind: 'round' | 'match'; roundNumber: number };
 
 const winnerLabel: Record<Winner, string> = {
   red: 'الأحمر',
@@ -13,15 +14,15 @@ const winnerLabel: Record<Winner, string> = {
 
 export default function DisplayPage() {
   const [isConnected, setIsConnected] = useState(false);
-  const [displayWinner, setDisplayWinner] = useState<Winner | null>(null);
-  const [match, setMatch] = useState<PublicMatch>({ id: 1, title: 'النزال رقم 1', redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق' });
+  const [displayResult, setDisplayResult] = useState<DisplayResult | null>(null);
+  const [match, setMatch] = useState<PublicMatch>({ id: 1, title: 'النزال رقم 1', redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق', rounds: [] });
 
   useEffect(() => {
     const socket: LocalSocket = createLocalSocket();
 
     socket.on('connect', () => setIsConnected(true));
     socket.on('disconnect', () => setIsConnected(false));
-    socket.on('update_display_result', (winner: Winner | null) => setDisplayWinner(winner));
+    socket.on('update_display_result', (result: DisplayResult | null) => setDisplayResult(result));
     socket.on('update_display', (nextMatch: PublicMatch) => setMatch(nextMatch));
 
     return () => socket.disconnect();
@@ -48,21 +49,21 @@ export default function DisplayPage() {
         </header>
 
         <section className="flex flex-1 flex-col justify-center py-8 sm:py-12">
-          <p className="mb-2 text-center text-base font-bold text-slate-400 sm:text-xl">النزال رقم {match.id}</p>
+          <p className="mb-2 text-center text-base font-bold text-slate-400 sm:text-xl">النزال الحالي</p>
           <h2 className="mb-4 text-center text-2xl font-black sm:text-4xl">{match.title}</h2>
           <p className="mb-6 flex justify-center gap-3 text-center text-sm font-bold sm:text-lg"><span className="text-red-400">{match.redTeam}</span><span className="text-slate-500">ضد</span><span className="text-blue-400">{match.blueTeam}</span></p>
           <div className={`relative overflow-hidden rounded-[2rem] border p-8 text-center shadow-2xl transition-colors sm:p-14 ${
-            displayWinner === 'red'
+            displayResult?.winner === 'red'
               ? 'border-red-400 bg-red-600 shadow-red-950/60'
-              : displayWinner === 'blue'
+              : displayResult?.winner === 'blue'
                 ? 'border-blue-400 bg-blue-600 shadow-blue-950/60'
                 : 'border-slate-700 bg-slate-900'
           }`}>
             <p className="relative z-10 mb-4 text-lg font-bold text-white/80 sm:text-2xl">
-              {displayWinner ? 'إعلان لجنة التحكيم' : 'بانتظار إعلان لجنة التحكيم'}
+              {displayResult?.kind === 'match' ? 'الفائز في النزال' : displayResult ? `الجولة ${displayResult.roundNumber}` : `الجولة ${Math.min((match.rounds?.length || 0) + 1, 3)}`}
             </p>
             <h2 className="relative z-10 text-5xl font-black tracking-tight sm:text-8xl">
-              {displayWinner ? `فوز ${winnerLabel[displayWinner]}` : 'بانتظار النتيجة'}
+              {displayResult ? `فوز ${winnerLabel[displayResult.winner]}` : 'بانتظار إعلان لجنة التحكيم'}
             </h2>
           </div>
 

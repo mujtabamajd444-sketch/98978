@@ -153,6 +153,12 @@ export default function JuryPage() {
     });
   };
 
+  const openMatches = () => {
+    socketRef.current?.emit('ensure_current_match', undefined, (response: { success: boolean }) => {
+      if (response.success) setIsMatchesOpen(true);
+    });
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="h-[100dvh] w-full bg-slate-950 text-slate-50 flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
@@ -207,7 +213,7 @@ export default function JuryPage() {
               {editingMatch ? (
                 <div className="flex flex-col gap-4">
                   <h3 className="font-bold text-slate-200">تعديل النزال رقم {editingMatch.id}</h3>
-                  <input value={matchDraft.title} onChange={(e) => setMatchDraft({ ...matchDraft, title: e.target.value })} placeholder="اسم النزال" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 text-white" />
+                  <input value={matchDraft.title} onChange={(e) => setMatchDraft({ ...matchDraft, title: e.target.value })} placeholder="عنوان أو رقم النزال، مثال: النزال رقم 5" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 text-white" />
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <input value={matchDraft.redTeam} onChange={(e) => setMatchDraft({ ...matchDraft, redTeam: e.target.value })} placeholder="اسم الفريق الأحمر" className="rounded-lg border border-red-900/70 bg-slate-950 px-3 py-3 text-white" />
                     <input value={matchDraft.blueTeam} onChange={(e) => setMatchDraft({ ...matchDraft, blueTeam: e.target.value })} placeholder="اسم الفريق الأزرق" className="rounded-lg border border-blue-900/70 bg-slate-950 px-3 py-3 text-white" />
@@ -326,7 +332,7 @@ export default function JuryPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <button onClick={() => setIsMatchesOpen(true)} className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-3 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2" title="سجل النزالات">
+          <button onClick={openMatches} className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-3 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2" title="تعديل عنوان وترقيم النزال">
             <ClipboardList className="w-4 h-4" />
             <span className="hidden sm:inline">النزالات</span>
           </button>
