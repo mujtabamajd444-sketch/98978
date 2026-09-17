@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { createLocalSocket, type LocalSocket } from '../lib/localSystem';
-import { RotateCcw, Home, Settings, X, ClipboardList, Pencil } from 'lucide-react';
+import { RotateCcw, Home, Settings, X, ClipboardList, Pencil, SkipForward } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { APP_VERSION } from '../lib/version';
 import AnimatedNotice from '../components/AnimatedNotice';
@@ -344,6 +344,15 @@ export default function JuryPage() {
             <RotateCcw className="w-4 h-4" />
             <span className="hidden sm:inline">إعادة تعيين الجولة</span>
             <span className="sm:hidden">إعادة</span>
+          </button>
+          <button
+            onClick={() => socketRef.current?.emit('advance_to_next_match')}
+            className="bg-amber-600 hover:bg-amber-500 text-white border border-amber-400/40 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2 active:scale-95"
+            title="إنهاء النزال بالقاضية وفتح النزال التالي"
+          >
+            <SkipForward className="w-4 h-4" />
+            <span className="hidden sm:inline">قاضية / نزال جديد</span>
+            <span className="sm:hidden">نزال جديد</span>
           </button>
         </div>
       </header>

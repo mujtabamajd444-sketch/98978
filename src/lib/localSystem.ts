@@ -1,10 +1,10 @@
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, runTransaction, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 export type Winner = 'red' | 'blue';
 type Vote = Winner | null;
 type Handler = (...args: any[]) => void;
-type Referee = { name: string; socketId: string | null };
+type Referee = { name: string; socketId: string | null; lastSeen?: number };
 type Round = { id: number; winner: Winner; timestamp: string; votes: Record<string, Vote> };
 type Match = { id: number; title: string; redTeam: string; blueTeam: string; rounds: Round[] };
 type Message = { sender: string; text: string; timestamp: string };
@@ -32,8 +32,41 @@ const sockets = new Set<LocalSocket>();
 const channel = new BroadcastChannel('muay-thai-static-system-v1');
 const systemDocument = doc(db, 'systems', 'muay-thai-default');
 let resetTimer: number | undefined;
+const REFEREE_LEASE_MS = 20_000;
+let staleCleanupTimer: number | undefined;
 
 function copy<T>(value: T): T { return structuredClone(value); }
+function refereeIsStale(referee: Referee) { return Boolean(referee.socketId && (!referee.lastSeen || Date.now() - referee.lastSeen > REFEREE_LEASE_MS)); }
+function clearStaleReferee(referee: Referee) {
+  if (!refereeIsStale(referee)) return false;
+  referee.socketId = null;
+  delete referee.lastSeen;
+  return true;
+}
+function announceLocalState(previous?: State) {
+  channel.postMessage({ type: 'state', state: copy(state) });
+  announce(previous);
+}
+
+async function releaseStaleReferees() {
+  const previous = copy(state);
+  try {
+    const result = await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(systemDocument);
+      if (!snapshot.exists()) return { current: state, changed: false };
+      const current = snapshot.data() as State;
+      const changed = Object.values(current.referees).some(clearStaleReferee);
+      if (changed) transaction.set(systemDocument, current);
+      return { current, changed };
+    });
+    if (result.changed) {
+      state = result.current;
+      announceLocalState(previous);
+    }
+  } catch (error) {
+    console.error('تعذر تحرير جلسة الحكم المنتهية:', error);
+  }
+}
 function displayMatch() { return copy(state.matches.at(-1) || { id: 1, title: 'النزال رقم 1', redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق', rounds: [] }); }
 function notifyAll(event: string, ...args: any[]) { sockets.forEach(socket => socket.receive(event, ...args)); }
 
@@ -49,11 +82,10 @@ function announce(previous?: State) {
 }
 
 function broadcast(previous?: State) {
-  channel.postMessage({ type: 'state', state: copy(state) });
+  announceLocalState(previous);
   void setDoc(systemDocument, copy(state)).catch((error) => {
     console.error('تعذر حفظ حالة النظام في Firestore:', error);
   });
-  announce(previous);
 }
 
 onSnapshot(systemDocument, (snapshot) => {
@@ -80,10 +112,15 @@ channel.onmessage = (event: MessageEvent) => {
 export class LocalSocket {
   readonly id = crypto.randomUUID();
   private handlers = new Map<string, Set<Handler>>();
+  private claimedRefereeId: string | null = null;
+  private heartbeat: number | undefined;
+  private disconnected = false;
+  private advancing = false;
   jury = false;
 
   constructor() {
     sockets.add(this);
+    if (!staleCleanupTimer) staleCleanupTimer = window.setInterval(() => { void releaseStaleReferees(); }, 5_000);
     queueMicrotask(() => {
       this.receive('connect');
       announce();
@@ -94,41 +131,31 @@ export class LocalSocket {
   on(event: string, handler: Handler) { if (!this.handlers.has(event)) this.handlers.set(event, new Set()); this.handlers.get(event)!.add(handler); return this; }
   receive(event: string, ...args: any[]) { this.handlers.get(event)?.forEach(handler => handler(...args)); }
   disconnect() {
-    Object.values(state.referees).forEach(referee => { if (referee.socketId === this.id) referee.socketId = null; });
-    sockets.delete(this); broadcast(); this.receive('disconnect');
+    if (this.disconnected) return;
+    this.disconnected = true;
+    if (this.heartbeat) window.clearInterval(this.heartbeat);
+    void this.releaseClaim();
+    sockets.delete(this);
+    if (sockets.size === 0 && staleCleanupTimer) {
+      window.clearInterval(staleCleanupTimer);
+      staleCleanupTimer = undefined;
+    }
+    this.receive('disconnect');
   }
 
   emit(event: string, payload?: any, callback?: (response: any) => void) {
     const previous = copy(state);
     if (event === 'authenticate_jury') { this.jury = payload === state.passwords.jury; callback?.({ success: this.jury }); return this; }
-    if (event === 'claim_referee') {
-      const referee = state.referees[payload.id];
-      if (!referee) this.receive('claim_error', 'الحكم غير موجود');
-      else if (referee.socketId) this.receive('claim_error', 'هذا الحكم متصل حالياً');
-      else if (payload.password !== state.passwords[payload.id]) this.receive('claim_error', 'رمز المرور غير صحيح');
-      else { referee.socketId = this.id; broadcast(previous); this.receive('claim_success', payload.id); }
-      return this;
-    }
-    if (event === 'submit_vote') {
-      const { refereeId, color } = payload;
-      if (state.referees[refereeId]?.socketId !== this.id) { this.receive('vote_error', 'لا يمكنك التصويت إلا من دور الحكم الذي سجلت دخوله'); return this; }
-      if (state.votes[refereeId]) { this.receive('vote_error', 'تم تسجيل تصويت هذا الحكم لهذه الجولة'); return this; }
-      state.votes[refereeId] = color;
-      const colors = Object.values(state.votes);
-      const winner: Winner | null = colors.filter(vote => vote === 'red').length >= 2 ? 'red' : colors.filter(vote => vote === 'blue').length >= 2 ? 'blue' : null;
-      if (winner) {
-        state.winner = winner;
-        const round: Round = { id: state.rounds.length + 1, winner, timestamp: new Date().toISOString(), votes: copy(state.votes) };
-        state.rounds.push(round);
-        let match = state.matches.at(-1);
-        if (!match || match.rounds.length === 3) { match = { id: state.matches.length + 1, title: `النزال رقم ${state.matches.length + 1}`, redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق', rounds: [] }; state.matches.push(match); }
-        match.rounds.push(round);
-        if (resetTimer) clearTimeout(resetTimer);
-        resetTimer = window.setTimeout(() => this.resetRound(), 30000);
-      }
-      broadcast(previous); return this;
-    }
+    if (event === 'claim_referee') { void this.claimReferee(payload); return this; }
+    if (event === 'submit_vote') { void this.submitVote(payload); return this; }
     if (event === 'trigger_reset') { if (!this.jury) { callback?.({ success: false, message: 'يجب تسجيل دخول لجنة التحكيم أولاً' }); return this; } this.resetRound(); callback?.({ success: true }); return this; }
+    if (event === 'advance_to_next_match') {
+      if (!this.jury) { callback?.({ success: false, message: 'يجب تسجيل دخول لجنة التحكيم أولاً' }); return this; }
+      if (this.advancing) { callback?.({ success: false, message: 'جارٍ فتح النزال التالي' }); return this; }
+      this.advancing = true;
+      void this.advanceToNextMatch().finally(() => { this.advancing = false; });
+      callback?.({ success: true }); return this;
+    }
     if (event === 'send_message') { state.messages.push(payload); broadcast(previous); return this; }
     if (event === 'set_settings') {
       if (!this.jury) { callback?.({ success: false, message: 'يجب تسجيل دخول لجنة التحكيم أولاً' }); return this; }
@@ -156,6 +183,141 @@ export class LocalSocket {
     if (resetTimer) clearTimeout(resetTimer); resetTimer = undefined;
     state.votes = { '1': null, '2': null, '3': null }; state.winner = null;
     broadcast(); notifyAll('round_reset');
+  }
+
+  private async claimReferee(payload: { id: string; password: string }) {
+    const previous = copy(state);
+    try {
+      const next = await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(systemDocument);
+        const current = (snapshot.exists() ? snapshot.data() : state) as State;
+        const referee = current.referees?.[payload.id];
+        if (!referee) throw new Error('الحكم غير موجود');
+        clearStaleReferee(referee);
+        if (referee.socketId) throw new Error('هذا الحكم متصل حالياً');
+        if (payload.password !== current.passwords?.[payload.id]) throw new Error('رمز المرور غير صحيح');
+        referee.socketId = this.id;
+        referee.lastSeen = Date.now();
+        transaction.set(systemDocument, current);
+        return current;
+      });
+      state = next;
+      this.claimedRefereeId = payload.id;
+      this.startHeartbeat();
+      announceLocalState(previous);
+      this.receive('claim_success', payload.id);
+    } catch (error) {
+      this.receive('claim_error', error instanceof Error ? error.message : 'تعذر تسجيل الدخول');
+    }
+  }
+
+  private async submitVote(payload: { refereeId: string; color: Winner }) {
+    const previous = copy(state);
+    try {
+      let recordedWinner: Winner | null = null;
+      const next = await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(systemDocument);
+        const current = (snapshot.exists() ? snapshot.data() : state) as State;
+        if (current.referees?.[payload.refereeId]?.socketId !== this.id) throw new Error('لا يمكنك التصويت إلا من دور الحكم الذي سجلت دخوله');
+        if (current.winner) throw new Error('انتهت هذه الجولة بالفعل ولا يقبل النظام تصويتًا متأخرًا');
+        if (current.votes?.[payload.refereeId]) throw new Error('تم تسجيل تصويت هذا الحكم لهذه الجولة');
+        current.votes[payload.refereeId] = payload.color;
+        const votes = Object.values(current.votes);
+        const winner: Winner | null = votes.filter((vote) => vote === 'red').length >= 2 ? 'red' : votes.filter((vote) => vote === 'blue').length >= 2 ? 'blue' : null;
+        if (winner) {
+          current.winner = winner;
+          const round: Round = { id: current.rounds.length + 1, winner, timestamp: new Date().toISOString(), votes: copy(current.votes) };
+          current.rounds.push(round);
+          let match = current.matches.at(-1);
+          if (!match || match.rounds.length === 3) { match = { id: current.matches.length + 1, title: `النزال رقم ${current.matches.length + 1}`, redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق', rounds: [] }; current.matches.push(match); }
+          match.rounds.push(round);
+          recordedWinner = winner;
+        }
+        transaction.set(systemDocument, current);
+        return current;
+      });
+      state = next;
+      announceLocalState(previous);
+      if (recordedWinner) {
+        if (resetTimer) clearTimeout(resetTimer);
+        resetTimer = window.setTimeout(() => this.resetRound(), 30_000);
+      }
+    } catch (error) {
+      this.receive('vote_error', error instanceof Error ? error.message : 'تعذر تسجيل التصويت');
+    }
+  }
+
+  private startHeartbeat() {
+    if (this.heartbeat) window.clearInterval(this.heartbeat);
+    this.heartbeat = window.setInterval(() => {
+      void this.renewLease();
+    }, 8_000);
+  }
+
+  private async renewLease() {
+    const refereeId = this.claimedRefereeId;
+    if (!refereeId || this.disconnected) return;
+    try {
+      const next = await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(systemDocument);
+        if (!snapshot.exists()) return null;
+        const current = snapshot.data() as State;
+        if (current.referees?.[refereeId]?.socketId !== this.id) return null;
+        current.referees[refereeId].lastSeen = Date.now();
+        transaction.set(systemDocument, current);
+        return current;
+      });
+      if (next) state = next;
+    } catch (error) {
+      console.error('تعذر تجديد جلسة الحكم:', error);
+    }
+  }
+
+  private async releaseClaim() {
+    const refereeId = this.claimedRefereeId;
+    this.claimedRefereeId = null;
+    if (!refereeId) return;
+    const previous = copy(state);
+    try {
+      const result = await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(systemDocument);
+        if (!snapshot.exists()) return { current: state, released: false };
+        const current = snapshot.data() as State;
+        const referee = current.referees?.[refereeId];
+        if (!referee || referee.socketId !== this.id) return { current, released: false };
+        referee.socketId = null;
+        delete referee.lastSeen;
+        transaction.set(systemDocument, current);
+        return { current, released: true };
+      });
+      if (result.released) {
+        state = result.current;
+        announceLocalState(previous);
+      }
+    } catch (error) {
+      console.error('تعذر إنهاء جلسة الحكم:', error);
+    }
+  }
+
+  private async advanceToNextMatch() {
+    if (resetTimer) clearTimeout(resetTimer); resetTimer = undefined;
+    const previous = copy(state);
+    try {
+      const next = await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(systemDocument);
+        const current = (snapshot.exists() ? snapshot.data() : state) as State;
+        current.votes = { '1': null, '2': null, '3': null };
+        current.winner = null;
+        current.matches.push({ id: current.matches.length + 1, title: `النزال رقم ${current.matches.length + 1}`, redTeam: 'الفريق الأحمر', blueTeam: 'الفريق الأزرق', rounds: [] });
+        transaction.set(systemDocument, current);
+        return current;
+      });
+      state = next;
+      announceLocalState(previous);
+      notifyAll('round_reset');
+    } catch (error) {
+      console.error('تعذر فتح النزال التالي:', error);
+    }
   }
 }
 

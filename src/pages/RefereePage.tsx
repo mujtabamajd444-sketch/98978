@@ -73,7 +73,11 @@ export default function RefereePage() {
       setMessages((prev) => [...prev, msg]);
     });
 
+    const releaseOnPageExit = () => socket.disconnect();
+    window.addEventListener('pagehide', releaseOnPageExit);
+
     return () => {
+      window.removeEventListener('pagehide', releaseOnPageExit);
       socket.disconnect();
     };
   }, []);
